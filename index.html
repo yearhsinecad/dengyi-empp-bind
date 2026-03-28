@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>員購資格綁定</title>
+<script src="https://static.line-scdn.net/liff/edge/versions/2.22.3/sdk.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --gold: #C8932A;
+    --gold-light: #E8B84B;
+    --gold-dark: #9A6E1A;
+    --bg: #F9F6F0;
+    --surface: #FFFFFF;
+    --text: #1A1A1A;
+    --text-muted: #888;
+    --border: #E5DDD0;
+    --error: #C0392B;
+    --success: #27AE60;
+    --radius: 12px;
+  }
+
+  body {
+    font-family: 'Noto Sans TC', sans-serif;
+    background: var(--bg);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 16px;
+  }
+
+  .card {
+    background: var(--surface);
+    border-radius: 20px;
+    padding: 32px 24px;
+    width: 100%;
+    max-width: 400px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, var(--gold-dark), var(--gold-light), var(--gold-dark));
+  }
+
+  .brand {
+    text-align: center;
+    margin-bottom: 28px;
+  }
+
+  .brand-logo {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    color: var(--gold-dark);
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+
+  .brand-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+
+  .brand-sub {
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+
+  .divider {
+    height: 1px;
+    background: var(--border);
+    margin: 20px 0;
+  }
+
+  .field {
+    margin-bottom: 16px;
+  }
+
+  .field label {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+    letter-spacing: 0.03em;
+  }
+
+  .field label span {
+    color: var(--error);
+    margin-left: 2px;
+  }
+
+  .field input {
+    width: 100%;
+    padding: 14px 16px;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 16px;
+    font-family: inherit;
+    color: var(--text);
+    background: var(--bg);
+    transition: border-color 0.2s, box-shadow 0.2s;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  .field input:focus {
+    outline: none;
+    border-color: var(--gold);
+    box-shadow: 0 0 0 3px rgba(200,147,42,0.12);
+    background: #fff;
+  }
+
+  .field input::placeholder {
+    color: #C5BDB0;
+  }
+
+  .hint {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 6px;
+  }
+
+  .btn {
+    width: 100%;
+    padding: 16px;
+    background: var(--gold);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius);
+    font-size: 16px;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+    letter-spacing: 0.05em;
+    transition: background 0.2s, transform 0.1s;
+    margin-top: 8px;
+  }
+
+  .btn:active { transform: scale(0.98); }
+  .btn:hover { background: var(--gold-dark); }
+  .btn:disabled {
+    background: #CCC;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  .status {
+    display: none;
+    padding: 12px 16px;
+    border-radius: var(--radius);
+    font-size: 14px;
+    margin-top: 16px;
+    line-height: 1.5;
+  }
+
+  .status.error {
+    display: block;
+    background: #FEF0EF;
+    color: var(--error);
+    border: 1px solid #FADBD8;
+  }
+
+  .status.success {
+    display: block;
+    background: #EAFAF1;
+    color: var(--success);
+    border: 1px solid #A9DFBF;
+  }
+
+  .status.loading {
+    display: block;
+    background: #FEF9EF;
+    color: var(--gold-dark);
+    border: 1px solid #F9E4B7;
+  }
+
+  .spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid currentColor;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    vertical-align: middle;
+    margin-right: 6px;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .success-screen {
+    display: none;
+    text-align: center;
+    padding: 8px 0;
+  }
+
+  .success-icon {
+    font-size: 52px;
+    margin-bottom: 16px;
+  }
+
+  .success-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--success);
+    margin-bottom: 8px;
+  }
+
+  .success-msg {
+    font-size: 14px;
+    color: var(--text-muted);
+    line-height: 1.6;
+  }
+
+  .close-btn {
+    margin-top: 24px;
+    width: 100%;
+    padding: 14px;
+    background: var(--success);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius);
+    font-size: 15px;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+  }
+
+  .footer {
+    text-align: center;
+    margin-top: 20px;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <!-- 品牌 -->
+  <div class="brand">
+    <div class="brand-logo">Dengyi · 登義</div>
+    <div class="brand-title">員購資格綁定</div>
+    <div class="brand-sub">輸入員工編號與手機號碼完成驗證</div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- 表單 -->
+  <div id="form-section">
+    <div class="field">
+      <label>員工編號<span>*</span></label>
+      <input type="text" id="emp-id" placeholder="例：EMP001" autocomplete="off" inputmode="text">
+    </div>
+
+    <div class="field">
+      <label>手機號碼<span>*</span></label>
+      <input type="tel" id="phone" placeholder="09xxxxxxxx" autocomplete="off" inputmode="numeric" maxlength="10">
+      <div class="hint">請輸入登記在人資系統的手機號碼</div>
+    </div>
+
+    <button class="btn" id="submit-btn" onclick="handleSubmit()">確認綁定</button>
+
+    <div class="status" id="status-msg"></div>
+  </div>
+
+  <!-- 成功畫面 -->
+  <div class="success-screen" id="success-section">
+    <div class="success-icon">✅</div>
+    <div class="success-title">綁定成功！</div>
+    <div class="success-msg">員購資格已開通<br>至門市消費可享八折優惠</div>
+    <button class="close-btn" onclick="closeLiff()">關閉</button>
+  </div>
+</div>
+
+<div class="footer">登義益新企業 · 員購系統</div>
+
+<script>
+  const LIFF_ID = '2009632010-pFj2SZTa';
+  const N8N_WEBHOOK = 'https://hqn8n.dengyi.link/webhook/empp-bind';
+
+  let lineUserId = '';
+
+  // 初始化 LIFF
+  async function initLiff() {
+    try {
+      await liff.init({ liffId: LIFF_ID });
+      if (!liff.isLoggedIn()) {
+        liff.login();
+        return;
+      }
+      const profile = await liff.getProfile();
+      lineUserId = profile.userId;
+      console.log('LIFF 初始化成功, userId:', lineUserId);
+    } catch (err) {
+      showStatus('error', '初始化失敗，請關閉後重新開啟。');
+      console.error(err);
+    }
+  }
+
+  // 送出綁定
+  async function handleSubmit() {
+    const empId = document.getElementById('emp-id').value.trim();
+    const phone = document.getElementById('phone').value.trim();
+
+    // 基本驗證
+    if (!empId) { showStatus('error', '請輸入員工編號'); return; }
+    if (!phone || !/^09\d{8}$/.test(phone)) {
+      showStatus('error', '請輸入正確的手機號碼格式（09xxxxxxxx）');
+      return;
+    }
+    if (!lineUserId) { showStatus('error', '尚未取得 LINE 身份，請關閉後重新開啟。'); return; }
+
+    // 送出
+    const btn = document.getElementById('submit-btn');
+    btn.disabled = true;
+    showStatus('loading', '<span class="spinner"></span>驗證中，請稍候…');
+
+    try {
+      const res = await fetch(N8N_WEBHOOK, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          lineUserId,
+          empId,
+          phone
+        })
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        document.getElementById('form-section').style.display = 'none';
+        document.getElementById('status-msg').style.display = 'none';
+        document.getElementById('success-section').style.display = 'block';
+      } else {
+        showStatus('error', data.message || '驗證失敗，請確認員工編號與手機號碼是否正確。');
+        btn.disabled = false;
+      }
+    } catch (err) {
+      showStatus('error', '系統連線異常，請稍後再試。');
+      btn.disabled = false;
+    }
+  }
+
+  function showStatus(type, msg) {
+    const el = document.getElementById('status-msg');
+    el.className = 'status ' + type;
+    el.innerHTML = msg;
+  }
+
+  function closeLiff() {
+    if (liff.isInClient()) {
+      liff.closeWindow();
+    } else {
+      window.close();
+    }
+  }
+
+  // 啟動
+  initLiff();
+</script>
+</body>
+</html>
