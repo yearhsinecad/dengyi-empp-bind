@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>員購資格綁定</title>
+<title>員購系統</title>
 <script src="https://static.line-scdn.net/liff/edge/versions/2.22.3/sdk.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap');
@@ -21,6 +21,7 @@
     --border: #E5DDD0;
     --error: #C0392B;
     --success: #27AE60;
+    --warning: #E67E22;
     --radius: 12px;
   }
 
@@ -56,7 +57,7 @@
 
   .brand {
     text-align: center;
-    margin-bottom: 28px;
+    margin-bottom: 24px;
   }
 
   .brand-logo {
@@ -86,10 +87,108 @@
     margin: 20px 0;
   }
 
+  /* ========== 所有畫面共用 ========== */
+  .screen {
+    display: none;
+    animation: fadeIn 0.4s ease;
+  }
+  .screen.active {
+    display: block;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ========== Loading 畫面 ========== */
+  .loading-steps {
+    padding: 8px 0;
+  }
+  .loading-step {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 4px;
+    font-size: 15px;
+    color: var(--text-muted);
+    opacity: 0.35;
+    transition: all 0.3s ease;
+  }
+  .loading-step.active {
+    opacity: 1;
+    color: var(--text);
+    font-weight: 500;
+  }
+  .loading-step.done {
+    opacity: 1;
+    color: var(--gold-dark);
+  }
+  .loading-step .step-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    background: #fff;
+  }
+  .loading-step.active .step-icon {
+    border-color: var(--gold);
+    border-top-color: transparent;
+    animation: spin 0.9s linear infinite;
+  }
+  .loading-step.done .step-icon {
+    background: var(--gold);
+    border-color: var(--gold);
+    color: #fff;
+  }
+  .loading-step.done .step-icon::before {
+    content: '✓';
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ========== 狀態畫面（成功/待處理/失敗等）========== */
+  .state-view {
+    text-align: center;
+    padding: 12px 4px;
+  }
+  .state-icon {
+    font-size: 56px;
+    margin-bottom: 16px;
+    line-height: 1;
+  }
+  .state-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 10px;
+  }
+  .state-msg {
+    font-size: 14px;
+    color: var(--text-muted);
+    line-height: 1.7;
+    margin-bottom: 24px;
+    padding: 0 4px;
+  }
+  .state-highlight {
+    background: #FEF9EF;
+    border-left: 3px solid var(--gold);
+    padding: 12px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    color: var(--text);
+    line-height: 1.6;
+    text-align: left;
+    margin-bottom: 20px;
+  }
+
+  /* ========== 表單（維持原有結構）========== */
   .field {
     margin-bottom: 16px;
   }
-
   .field label {
     display: block;
     font-size: 13px;
@@ -98,12 +197,10 @@
     margin-bottom: 8px;
     letter-spacing: 0.03em;
   }
-
   .field label span {
     color: var(--error);
     margin-left: 2px;
   }
-
   .field input {
     width: 100%;
     padding: 14px 16px;
@@ -117,18 +214,13 @@
     -webkit-appearance: none;
     appearance: none;
   }
-
   .field input:focus {
     outline: none;
     border-color: var(--gold);
     box-shadow: 0 0 0 3px rgba(200,147,42,0.12);
     background: #fff;
   }
-
-  .field input::placeholder {
-    color: #C5BDB0;
-  }
-
+  .field input::placeholder { color: #C5BDB0; }
   .hint {
     font-size: 12px;
     color: var(--text-muted);
@@ -150,13 +242,21 @@
     transition: background 0.2s, transform 0.1s;
     margin-top: 8px;
   }
-
   .btn:active { transform: scale(0.98); }
   .btn:hover { background: var(--gold-dark); }
   .btn:disabled {
     background: #CCC;
     cursor: not-allowed;
     transform: none;
+  }
+  .btn.btn-secondary {
+    background: transparent;
+    color: var(--gold-dark);
+    border: 1.5px solid var(--border);
+  }
+  .btn.btn-secondary:hover {
+    background: var(--bg);
+    border-color: var(--gold);
   }
 
   .status {
@@ -167,28 +267,18 @@
     margin-top: 16px;
     line-height: 1.5;
   }
-
   .status.error {
     display: block;
     background: #FEF0EF;
     color: var(--error);
     border: 1px solid #FADBD8;
   }
-
-  .status.success {
-    display: block;
-    background: #EAFAF1;
-    color: var(--success);
-    border: 1px solid #A9DFBF;
-  }
-
   .status.loading {
     display: block;
     background: #FEF9EF;
     color: var(--gold-dark);
     border: 1px solid #F9E4B7;
   }
-
   .spinner {
     display: inline-block;
     width: 14px;
@@ -199,46 +289,6 @@
     animation: spin 0.7s linear infinite;
     vertical-align: middle;
     margin-right: 6px;
-  }
-
-  @keyframes spin { to { transform: rotate(360deg); } }
-
-  .success-screen {
-    display: none;
-    text-align: center;
-    padding: 8px 0;
-  }
-
-  .success-icon {
-    font-size: 52px;
-    margin-bottom: 16px;
-  }
-
-  .success-title {
-    font-size: 20px;
-    font-weight: 700;
-    color: var(--success);
-    margin-bottom: 8px;
-  }
-
-  .success-msg {
-    font-size: 14px;
-    color: var(--text-muted);
-    line-height: 1.6;
-  }
-
-  .close-btn {
-    margin-top: 24px;
-    width: 100%;
-    padding: 14px;
-    background: var(--success);
-    color: #fff;
-    border: none;
-    border-radius: var(--radius);
-    font-size: 15px;
-    font-weight: 700;
-    font-family: inherit;
-    cursor: pointer;
   }
 
   .footer {
@@ -252,102 +302,318 @@
 <body>
 
 <div class="card">
-  <!-- 品牌 -->
+  <!-- 品牌 header -->
   <div class="brand">
     <div class="brand-logo">Dengyi · 登義</div>
-    <div class="brand-title">員購資格綁定</div>
-    <div class="brand-sub">輸入員工編號與手機號碼完成驗證</div>
+    <div class="brand-title" id="brand-title">員購系統</div>
+    <div class="brand-sub" id="brand-sub">資料處理中</div>
   </div>
 
   <div class="divider"></div>
 
-  <!-- 表單 -->
-  <div id="form-section">
+  <!-- ========== Screen A: 載入中（預設顯示）========== -->
+  <div class="screen active" id="screen-loading">
+    <div class="loading-steps">
+      <div class="loading-step active" id="step-1">
+        <div class="step-icon"></div>
+        <div>驗證 LINE 身分</div>
+      </div>
+      <div class="loading-step" id="step-2">
+        <div class="step-icon"></div>
+        <div>查詢員購綁定狀態</div>
+      </div>
+      <div class="loading-step" id="step-3">
+        <div class="step-icon"></div>
+        <div>檢查待回報紀錄</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== Screen B: 綁定表單（unbound）========== -->
+  <div class="screen" id="screen-form">
     <div class="field">
       <label>員工編號<span>*</span></label>
       <input type="text" id="emp-id" placeholder="例：EMP001" autocomplete="off" inputmode="text">
     </div>
-
     <div class="field">
       <label>手機號碼<span>*</span></label>
       <input type="tel" id="phone" placeholder="09xxxxxxxx" autocomplete="off" inputmode="numeric" maxlength="10">
       <div class="hint">請輸入登記在人資系統的手機號碼</div>
     </div>
-
     <button class="btn" id="submit-btn" onclick="handleSubmit()">確認綁定</button>
-
     <div class="status" id="status-msg"></div>
   </div>
 
-  <!-- 成功畫面 -->
-  <div class="success-screen" id="success-section">
-    <div class="success-icon">✅</div>
-    <div class="success-title">綁定成功！</div>
-    <div class="success-msg">員購資格已開通<br>至門市消費可享八折優惠</div>
-    <button class="close-btn" onclick="closeLiff()">關閉</button>
+  <!-- ========== Screen C: 綁定申請處理中（pending_apply）========== -->
+  <div class="screen" id="screen-pending">
+    <div class="state-view">
+      <div class="state-icon">⏳</div>
+      <div class="state-title">申請處理中</div>
+      <div class="state-msg">
+        您的員購綁定申請正在處理中<br>
+        請稍候系統完成審核
+      </div>
+      <div class="state-highlight">
+        系統會在開通後主動透過 LINE 通知您，開通後即可使用員購功能。
+      </div>
+      <button class="btn" onclick="closeLiff()">關閉</button>
+    </div>
+  </div>
+
+  <!-- ========== Screen D: 綁定失敗（failed）========== -->
+  <div class="screen" id="screen-failed">
+    <div class="state-view">
+      <div class="state-icon">⚠️</div>
+      <div class="state-title">綁定失敗</div>
+      <div class="state-msg">
+        系統無法完成您的員購綁定<br>
+        請聯繫人資確認資料
+      </div>
+      <div class="state-highlight">
+        常見原因：員工編號或手機號碼與人資系統紀錄不符，或 SHOPLINE 會員尚未建立。請先與人資聯絡確認身分後再重新申請。
+      </div>
+      <button class="btn" onclick="closeLiff()">關閉</button>
+    </div>
+  </div>
+
+  <!-- ========== Screen E: 資格已失效（expired）========== -->
+  <div class="screen" id="screen-expired">
+    <div class="state-view">
+      <div class="state-icon">⛔</div>
+      <div class="state-title">員購資格已失效</div>
+      <div class="state-msg">
+        您的員購資格目前為停用狀態<br>
+        如需重新啟用，請聯繫人資
+      </div>
+      <div class="state-highlight">
+        通常在離職、資格取消或異動後系統會自動停用。若您仍在職並需要恢復員購資格，請透過 LINE 或電話與人資確認。
+      </div>
+      <button class="btn" onclick="closeLiff()">關閉</button>
+    </div>
+  </div>
+
+  <!-- ========== Screen F: 已有資格但無待回報（bound_no_pending）========== -->
+  <div class="screen" id="screen-no-pending">
+    <div class="state-view">
+      <div class="state-icon">✅</div>
+      <div class="state-title">員購資格已開通</div>
+      <div class="state-msg" id="no-pending-msg">
+        您目前沒有待回報的員購消費紀錄
+      </div>
+      <div class="state-highlight">
+        系統會在偵測到您的員購消費後自動通知您上傳付款截圖。若您剛完成結帳、消費紀錄還沒出現，請稍後再試。
+      </div>
+      <button class="btn" onclick="closeLiff()">關閉</button>
+    </div>
+  </div>
+
+  <!-- ========== Screen G: 已有資格且有待回報（bound_has_pending）========== -->
+  <div class="screen" id="screen-has-pending">
+    <div class="state-view">
+      <div class="state-icon">📨</div>
+      <div class="state-title">已推送至聊天室</div>
+      <div class="state-msg" id="has-pending-msg">
+        已將您的待回報紀錄推送至聊天室
+      </div>
+      <div class="state-highlight">
+        請返回「登義人資‧新進人員報到小幫手」聊天室，找到剛收到的訊息，點擊每張卡片上的「前往回報」按鈕上傳付款截圖。
+      </div>
+      <button class="btn" onclick="closeLiff()">返回聊天室</button>
+    </div>
+  </div>
+
+  <!-- ========== Screen H: 系統錯誤（error）========== -->
+  <div class="screen" id="screen-error">
+    <div class="state-view">
+      <div class="state-icon">🔧</div>
+      <div class="state-title">系統連線異常</div>
+      <div class="state-msg" id="error-msg">
+        暫時無法處理您的請求，請稍後再試
+      </div>
+      <button class="btn" onclick="location.reload()">重新載入</button>
+      <button class="btn btn-secondary" onclick="closeLiff()" style="margin-top:10px">關閉</button>
+    </div>
   </div>
 </div>
 
 <div class="footer">登義益新企業 · 員購系統</div>
 
 <script>
+  // ========== 設定 ==========
   const LIFF_ID = '2009632010-pFj2SZTa';
-  const N8N_WEBHOOK = 'https://hqn8n.dengyi.link/webhook/empp-bind';
+  const WEBHOOK_CHECK = 'https://hqn8n.dengyi.link/webhook/empp-check';
+  const WEBHOOK_BIND = 'https://hqn8n.dengyi.link/webhook/empp-bind';
 
+  // ========== 狀態 ==========
   let lineUserId = '';
+  let userProfile = null;
 
-  // 初始化 LIFF
-  async function initLiff() {
+  // ========== 畫面切換 ==========
+  function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
+    const target = document.getElementById(id);
+    if (target) target.classList.add('active');
+  }
+
+  function setBrandHeader(title, sub) {
+    document.getElementById('brand-title').textContent = title;
+    document.getElementById('brand-sub').textContent = sub;
+  }
+
+  function markStep(n, state) {
+    // state: 'active' | 'done' | ''
+    const el = document.getElementById('step-' + n);
+    if (!el) return;
+    el.classList.remove('active', 'done');
+    if (state) el.classList.add(state);
+  }
+
+  // ========== 關閉 LIFF ==========
+  function closeLiff() {
+    if (typeof liff !== 'undefined' && liff.isInClient && liff.isInClient()) {
+      liff.closeWindow();
+    } else {
+      window.close();
+    }
+  }
+
+  // ========== 初始化 ==========
+  async function init() {
+    setBrandHeader('員購系統', '資料處理中');
+    showScreen('screen-loading');
+
     try {
+      // Step 1: LIFF init
       await liff.init({ liffId: LIFF_ID });
       if (!liff.isLoggedIn()) {
         liff.login();
         return;
       }
-      const profile = await liff.getProfile();
-      lineUserId = profile.userId;
-      console.log('LIFF 初始化成功, userId:', lineUserId);
+      userProfile = await liff.getProfile();
+      lineUserId = userProfile.userId;
+      markStep(1, 'done');
+
+      // Step 2: Call check webhook
+      markStep(2, 'active');
+      await sleep(250);
+      const res = await fetch(`${WEBHOOK_CHECK}?userId=${encodeURIComponent(lineUserId)}`, {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' }
+      });
+      if (!res.ok) throw new Error('webhook_failed_' + res.status);
+      const data = await res.json();
+      markStep(2, 'done');
+
+      // Step 3: Short pause for visual flow
+      markStep(3, 'active');
+      await sleep(350);
+      markStep(3, 'done');
+      await sleep(200);
+
+      // 根據 mode 分流
+      routeByMode(data);
     } catch (err) {
-      showStatus('error', '初始化失敗，請關閉後重新開啟。');
-      console.error(err);
+      console.error('init error:', err);
+      document.getElementById('error-msg').textContent = '錯誤：' + (err.message || '未知錯誤');
+      setBrandHeader('員購系統', '連線異常');
+      showScreen('screen-error');
     }
   }
 
-  // 送出綁定
+  function sleep(ms) {
+    return new Promise(r => setTimeout(r, ms));
+  }
+
+  // ========== 分流：依 mode 顯示對應畫面 ==========
+  function routeByMode(data) {
+    const mode = data.mode;
+    switch (mode) {
+      case 'unbound':
+        setBrandHeader('員購資格綁定', '輸入員工編號與手機完成驗證');
+        showScreen('screen-form');
+        break;
+
+      case 'pending_apply':
+        setBrandHeader('員購系統', '申請處理中');
+        showScreen('screen-pending');
+        break;
+
+      case 'failed':
+        setBrandHeader('員購系統', '綁定失敗');
+        showScreen('screen-failed');
+        break;
+
+      case 'expired':
+        setBrandHeader('員購系統', '資格已失效');
+        showScreen('screen-expired');
+        break;
+
+      case 'bound_no_pending':
+        setBrandHeader('員購系統', '目前無待回報');
+        if (data.empName) {
+          document.getElementById('no-pending-msg').innerHTML =
+            `${escapeHtml(data.empName)} 您好<br>您目前沒有待回報的員購消費紀錄`;
+        }
+        showScreen('screen-no-pending');
+        break;
+
+      case 'bound_has_pending':
+        setBrandHeader('員購系統', '待回報已推送');
+        const count = Number(data.count || 0);
+        const name = data.empName ? escapeHtml(data.empName) + ' 您好<br>' : '';
+        document.getElementById('has-pending-msg').innerHTML =
+          `${name}已將 <strong>${count}</strong> 筆待回報消費紀錄推送至聊天室`;
+        showScreen('screen-has-pending');
+        break;
+
+      default:
+        document.getElementById('error-msg').textContent = '未知的回應狀態：' + (mode || '(空)');
+        setBrandHeader('員購系統', '未知狀態');
+        showScreen('screen-error');
+    }
+  }
+
+  function escapeHtml(str) {
+    if (!str) return '';
+    return String(str).replace(/[&<>"']/g, s => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[s]));
+  }
+
+  // ========== 綁定表單提交（沿用原有流程）==========
   async function handleSubmit() {
     const empId = document.getElementById('emp-id').value.trim();
     const phone = document.getElementById('phone').value.trim();
 
-    // 基本驗證
-    if (!empId) { showStatus('error', '請輸入員工編號'); return; }
+    if (!empId) {
+      showStatus('error', '請輸入員工編號');
+      return;
+    }
     if (!phone || !/^09\d{8}$/.test(phone)) {
       showStatus('error', '請輸入正確的手機號碼格式（09xxxxxxxx）');
       return;
     }
-    if (!lineUserId) { showStatus('error', '尚未取得 LINE 身份，請關閉後重新開啟。'); return; }
+    if (!lineUserId) {
+      showStatus('error', '尚未取得 LINE 身分，請關閉後重新開啟');
+      return;
+    }
 
-    // 送出
     const btn = document.getElementById('submit-btn');
     btn.disabled = true;
     showStatus('loading', '<span class="spinner"></span>驗證中，請稍候…');
 
     try {
-      const res = await fetch(N8N_WEBHOOK, {
+      const res = await fetch(WEBHOOK_BIND, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          lineUserId,
-          empId,
-          phone
-        })
+        body: JSON.stringify({ lineUserId, empId, phone })
       });
-
       const data = await res.json();
 
       if (data.success) {
-        document.getElementById('form-section').style.display = 'none';
-        document.getElementById('status-msg').style.display = 'none';
-        document.getElementById('success-section').style.display = 'block';
+        // 綁定已送出，後續由 [EMPP v2] 排程開通處理，顯示 pending 畫面
+        setBrandHeader('員購系統', '申請已送出');
+        showScreen('screen-pending');
       } else {
         showStatus('error', data.message || '驗證失敗，請確認員工編號與手機號碼是否正確。');
         btn.disabled = false;
@@ -364,16 +630,8 @@
     el.innerHTML = msg;
   }
 
-  function closeLiff() {
-    if (liff.isInClient()) {
-      liff.closeWindow();
-    } else {
-      window.close();
-    }
-  }
-
   // 啟動
-  initLiff();
+  init();
 </script>
 </body>
 </html>
