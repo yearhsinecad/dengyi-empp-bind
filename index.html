@@ -434,6 +434,38 @@
       <button class="btn btn-secondary" onclick="closeLiff()" style="margin-top:10px">關閉</button>
     </div>
   </div>
+
+  <!-- ========== Screen I: 付款建單中（pay mode loading）========== -->
+  <div class="screen" id="screen-paying">
+    <div class="state-view">
+      <div class="state-icon">💳</div>
+      <div class="state-title">準備付款</div>
+      <div class="state-msg">
+        正在向豐收款建立付款訂單<br>
+        完成後會自動跳轉至付款頁面
+      </div>
+      <div class="state-highlight">
+        請勿關閉此頁面或返回，建單完成後系統會自動帶您前往付款頁。
+      </div>
+      <div style="margin-top:20px"><span class="spinner"></span></div>
+    </div>
+  </div>
+
+  <!-- ========== Screen J: 付款建單失敗（pay mode error）========== -->
+  <div class="screen" id="screen-pay-error">
+    <div class="state-view">
+      <div class="state-icon">⚠️</div>
+      <div class="state-title">無法建立付款</div>
+      <div class="state-msg" id="pay-error-msg">
+        暫時無法處理您的付款請求
+      </div>
+      <div class="state-highlight">
+        請返回 LINE 重新點擊付款卡片，或聯繫人資協助。
+      </div>
+      <button class="btn" onclick="location.reload()">重試</button>
+      <button class="btn btn-secondary" onclick="closeLiff()" style="margin-top:10px">關閉</button>
+    </div>
+  </div>
 </div>
 
 <div class="footer">登義 DengYi · 員購系統</div>
@@ -443,6 +475,7 @@
   const LIFF_ID = '2009632010-pFj2SZTa';
   const WEBHOOK_CHECK = 'https://hqn8n.dengyi.link/webhook/empp-check';
   const WEBHOOK_BIND = 'https://hqn8n.dengyi.link/webhook/empp-bind';
+  const WEBHOOK_PAY_CREATE = 'https://hqn8n.dengyi.link/webhook/empp-pay-create';
 
   // ========== 狀態 ==========
   let lineUserId = '';
@@ -480,6 +513,14 @@
 
   // ========== 初始化 ==========
   async function init() {
+    // [NEW] 解析 URL query 判斷模式：?page=pay 進入付款建單流程
+    const urlParams = new URLSearchParams(window.location.search);
+    const pageMode = urlParams.get('page');
+    if (pageMode === 'pay') {
+      return initPayMode(urlParams);
+    }
+
+    // [既有] 預設走綁定 / 待回報檢查流程
     setBrandHeader('員購系統', '資料處理中');
     showScreen('screen-loading');
 
@@ -583,6 +624,64 @@
     return String(str).replace(/[&<>"']/g, s => ({
       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
     }[s]));
+  }
+
+  // ========== 付款建單流程（pay mode）==========
+  async function initPayMode(urlParams) {
+    const orderNo = urlParams.get('orderNo');
+    const payType = urlParams.get('payType');  // A 或 C
+
+    setBrandHeader('員購付款', '正在準備付款資訊');
+    showScreen('screen-paying');
+
+    // 參數驗證
+    if (!orderNo || !payType || !['A', 'C'].includes(payType)) {
+      showPayError('參數錯誤，請從 LINE 卡片重新進入');
+      return;
+    }
+
+    try {
+      // LIFF init + 取 accessToken
+      await liff.init({ liffId: LIFF_ID });
+      if (!liff.isLoggedIn()) { liff.login(); return; }
+      userProfile = await liff.getProfile();
+      lineUserId = userProfile.userId;
+      accessToken = liff.getAccessToken();
+
+      // 呼叫 n8n WF3 建豐收款單
+      const res = await fetch(WEBHOOK_PAY_CREATE, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`
+        },
+        body: JSON.stringify({ orderNo, payType, lineUserId })
+      });
+
+      if (res.status === 401) { showPayError('授權失敗，請重新從 LINE 進入'); return; }
+      if (res.status === 404) { showPayError('找不到此訂單，請聯繫人資'); return; }
+      if (res.status === 409) { showPayError('此訂單已在處理中或已付款'); return; }
+      if (!res.ok) { showPayError(`建單失敗 (HTTP ${res.status})`); return; }
+
+      const data = await res.json();
+      if (!data.success || !data.paymentUrl) {
+        showPayError(data.message || '建單失敗，請稍後再試');
+        return;
+      }
+
+      // 自動跳豐收款付款頁
+      window.location.href = data.paymentUrl;
+
+    } catch (err) {
+      console.error('pay error:', err);
+      showPayError('系統連線異常：' + (err.message || '未知錯誤'));
+    }
+  }
+
+  function showPayError(msg) {
+    document.getElementById('pay-error-msg').textContent = msg;
+    setBrandHeader('員購付款', '無法完成付款');
+    showScreen('screen-pay-error');
   }
 
   // ========== 綁定表單提交（沿用原有流程）==========
