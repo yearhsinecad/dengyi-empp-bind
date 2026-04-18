@@ -451,6 +451,67 @@
     </div>
   </div>
 
+  <!-- ========== Screen K: 自製 ATM 付款頁（PayType=A）========== -->
+  <!-- TODO: SOP-2 附錄 A — 待 WF3 response 規格定稿後，補上 amount / expireAt 欄位顯示 -->
+  <div class="screen" id="screen-pay-atm">
+    <div class="state-view">
+      <div class="state-icon">🏧</div>
+      <div class="state-title">ATM 轉帳付款</div>
+      <div class="state-msg">
+        請使用以下虛擬帳號完成轉帳<br>
+        付款結果以永豐銀行豐收款查詢為準
+      </div>
+
+      <div class="field">
+        <label>銀行代碼</label>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="text" id="atm-bank-code" readonly value="" style="font-size:18px;letter-spacing:0.1em;text-align:center;font-weight:700">
+          <button class="btn" style="width:auto;padding:14px 18px;margin:0" onclick="copyAtmField('atm-bank-code', this)">複製</button>
+        </div>
+        <div class="hint">807 永豐銀行（分行代碼 021）</div>
+      </div>
+
+      <div class="field">
+        <label>虛擬帳號</label>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="text" id="atm-vacc" readonly value="" style="font-size:20px;letter-spacing:0.05em;text-align:center;font-weight:700">
+          <button class="btn" style="width:auto;padding:14px 18px;margin:0" onclick="copyAtmField('atm-vacc', this)">複製</button>
+        </div>
+        <div class="hint" id="atm-amount-hint"></div>
+      </div>
+
+      <div class="state-highlight" style="margin-top:8px">
+        以下虛擬帳號由【永豐銀行豐收款】產生，付款結果以豐收款查詢為準。如有疑慮，可改用豐收款官方頁完成付款 →
+        <a href="#" id="atm-fallback-link" onclick="switchToFunbizOfficial(event)" style="color:var(--gold-dark);font-weight:700;text-decoration:underline">切換</a>
+      </div>
+
+      <button class="btn" onclick="goRedirectPoll()">我已完成轉帳，立即查詢結果</button>
+      <button class="btn btn-secondary" onclick="switchToFunbizOfficial(event)" style="margin-top:10px">切換豐收款官方頁</button>
+      <div class="status" id="atm-status"></div>
+    </div>
+  </div>
+
+  <!-- ========== Screen L: 付款查詢中（auto poll + 手動）========== -->
+  <!-- TODO: SOP-2 附錄 A — WF5 webhook 上線前用 stub URL，回應後切換至成功/失敗畫面 -->
+  <div class="screen" id="screen-pay-redirect">
+    <div class="state-view">
+      <div class="state-icon">🔎</div>
+      <div class="state-title">查詢付款結果</div>
+      <div class="state-msg">
+        正在向永豐銀行豐收款確認您的付款狀態<br>
+        系統會自動查詢，您也可以手動立即查詢
+      </div>
+      <div class="state-highlight">
+        下次自動查詢倒數：<strong id="poll-countdown">5</strong> 秒<br>
+        若已完成轉帳但長時間無回應，可關閉此頁回 LINE 等候通知。
+      </div>
+      <div style="margin-top:16px"><span class="spinner"></span></div>
+      <button class="btn" onclick="manualPollNow()" style="margin-top:20px">我已完成轉帳，立即查詢結果</button>
+      <button class="btn btn-secondary" onclick="closeLiff()" style="margin-top:10px">關閉</button>
+      <div class="status" id="redirect-status"></div>
+    </div>
+  </div>
+
   <!-- ========== Screen J: 付款建單失敗（pay mode error）========== -->
   <div class="screen" id="screen-pay-error">
     <div class="state-view">
@@ -468,7 +529,7 @@
   </div>
 </div>
 
-<div class="footer">登義 DengYi · 員購系統</div>
+<div class="footer">登義 DengYi · 員購系統 · 付款由永豐銀行豐收款處理</div>
 
 <script>
   // ========== 設定 ==========
@@ -476,6 +537,14 @@
   const WEBHOOK_CHECK = 'https://hqn8n.dengyi.link/webhook/empp-check';
   const WEBHOOK_BIND = 'https://hqn8n.dengyi.link/webhook/empp-bind';
   const WEBHOOK_PAY_CREATE = 'https://hqn8n.dengyi.link/webhook/empp-pay-create';
+  // TODO: SOP-2 附錄 A — WF5 付款狀態查詢 webhook，目前為 stub，待 WF5 上線後接通
+  const WEBHOOK_PAY_STATUS = 'https://hqn8n.dengyi.link/webhook/funbiz-paystatus-query';
+
+  // 付款流程暫存（screen K → L 之間共用）
+  let currentOrderNo = '';
+  let currentPaymentUrl = '';   // 豐收款官方頁 fallback URL（PayType=A 時也帶回）
+  let pollTimer = null;
+  let countdownTimer = null;
 
   // ========== 狀態 ==========
   let lineUserId = '';
@@ -518,6 +587,9 @@
     const pageMode = urlParams.get('page');
     if (pageMode === 'pay') {
       return initPayMode(urlParams);
+    }
+    if (pageMode === 'redirect') {
+      return initRedirectMode(urlParams);
     }
 
     // [既有] 預設走綁定 / 待回報檢查流程
@@ -664,18 +736,224 @@
       if (!res.ok) { showPayError(`建單失敗 (HTTP ${res.status})`); return; }
 
       const data = await res.json();
-      if (!data.success || !data.paymentUrl) {
+      if (!data.success) {
         showPayError(data.message || '建單失敗，請稍後再試');
         return;
       }
 
-      // 自動跳豐收款付款頁
-      window.location.href = data.paymentUrl;
+      currentOrderNo = orderNo;
+      currentPaymentUrl = data.paymentUrl || '';
+
+      if (payType === 'A') {
+        // PayType=A：自製 ATM 頁（從 WF3 response 抽 atmInfo）
+        const atm = data.atmInfo || {};
+        const vacc = atm.virtualAccount || atm.vacc || data.virtualAccount || '';
+        const bankCode = atm.bankCode || data.bankCode || '807-021';
+        const amount = atm.amount || data.amount || '';
+        if (!vacc) {
+          showPayError('豐收款回應缺少虛擬帳號，請聯繫人資');
+          return;
+        }
+        document.getElementById('atm-vacc').value = vacc;
+        document.getElementById('atm-bank-code').value = bankCode;
+        if (amount) {
+          document.getElementById('atm-amount-hint').textContent = '應付金額：NT$ ' + amount;
+        }
+        setBrandHeader('員購付款 · ATM 轉帳', '永豐銀行豐收款');
+        showScreen('screen-pay-atm');
+        return;
+      }
+
+      // PayType=C：維持既有跳豐收款官方頁
+      if (!currentPaymentUrl) {
+        showPayError('建單失敗，請稍後再試');
+        return;
+      }
+      window.location.href = currentPaymentUrl;
 
     } catch (err) {
       console.error('pay error:', err);
       showPayError('系統連線異常：' + (err.message || '未知錯誤'));
     }
+  }
+
+  // ========== ATM 自製頁工具 ==========
+  function copyAtmField(elId, btn) {
+    const el = document.getElementById(elId);
+    if (!el) return;
+    const val = el.value;
+    const done = () => {
+      const old = btn.textContent;
+      btn.textContent = '已複製';
+      setTimeout(() => { btn.textContent = old; }, 1500);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(val).then(done).catch(() => {
+        el.select(); document.execCommand('copy'); done();
+      });
+    } else {
+      el.select(); document.execCommand('copy'); done();
+    }
+  }
+
+  // 切換到豐收款官方頁（fallback）
+  function switchToFunbizOfficial(ev) {
+    if (ev && ev.preventDefault) ev.preventDefault();
+    if (currentPaymentUrl) {
+      window.location.href = currentPaymentUrl;
+    } else {
+      // 若無 paymentUrl，回到 pay route 強制以 PayType=C 重建
+      const url = new URL(window.location.href);
+      url.searchParams.set('page', 'pay');
+      url.searchParams.set('payType', 'C');
+      if (currentOrderNo) url.searchParams.set('orderNo', currentOrderNo);
+      window.location.href = url.toString();
+    }
+  }
+
+  // 從 ATM 頁前往查詢頁
+  function goRedirectPoll() {
+    const url = new URL(window.location.href);
+    url.searchParams.set('page', 'redirect');
+    if (currentOrderNo) url.searchParams.set('orderNo', currentOrderNo);
+    url.searchParams.delete('payType');
+    window.location.href = url.toString();
+  }
+
+  // ========== 付款查詢（auto poll + manual）==========
+  async function initRedirectMode(urlParams) {
+    const orderNo = urlParams.get('orderNo');
+    setBrandHeader('員購付款 · 查詢中', '永豐銀行豐收款');
+    showScreen('screen-pay-redirect');
+
+    if (!orderNo) {
+      showPayError('參數錯誤，請從 LINE 卡片重新進入');
+      return;
+    }
+    currentOrderNo = orderNo;
+
+    try {
+      await liff.init({ liffId: LIFF_ID });
+      if (!liff.isLoggedIn()) { liff.login(); return; }
+      accessToken = liff.getAccessToken();
+    } catch (e) {
+      // LIFF 失敗仍允許查詢（webhook 不一定強制 LIFF token）
+      console.warn('LIFF init failed in redirect mode:', e);
+    }
+
+    startAutoPoll();
+  }
+
+  function startAutoPoll() {
+    stopAutoPoll();
+    let countdown = 5;
+    document.getElementById('poll-countdown').textContent = countdown;
+    countdownTimer = setInterval(() => {
+      countdown -= 1;
+      if (countdown <= 0) {
+        countdown = 5;
+        pollPayStatus(false);
+      }
+      const cd = document.getElementById('poll-countdown');
+      if (cd) cd.textContent = countdown;
+    }, 1000);
+  }
+
+  function stopAutoPoll() {
+    if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
+    if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; }
+  }
+
+  function manualPollNow() {
+    pollPayStatus(true);
+  }
+
+  async function pollPayStatus(isManual) {
+    const statusEl = document.getElementById('redirect-status');
+    if (statusEl) {
+      statusEl.className = 'status loading';
+      statusEl.innerHTML = '<span class="spinner"></span>查詢中…';
+    }
+    try {
+      // TODO: SOP-2 附錄 A — WF5 webhook 上線前為 stub；上線後改為實際 endpoint 並處理 paid/pending/failed
+      const url = `${WEBHOOK_PAY_STATUS}?orderNo=${encodeURIComponent(currentOrderNo)}`;
+      const res = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {})
+        }
+      });
+
+      // stub 階段：404 / 非 2xx 視為「尚無回應」，繼續等下一輪
+      if (!res.ok) {
+        if (statusEl) {
+          statusEl.className = 'status loading';
+          statusEl.innerHTML = isManual
+            ? '尚未收到豐收款回報，請稍候系統自動重試'
+            : '<span class="spinner"></span>尚在等待豐收款回報…';
+        }
+        return;
+      }
+
+      const data = await res.json().catch(() => ({}));
+      const st = (data.status || '').toLowerCase();
+      if (st === 'paid' || st === 'success') {
+        stopAutoPoll();
+        handlePaySuccess(data);
+      } else if (st === 'failed' || st === 'expired') {
+        stopAutoPoll();
+        showPayError(data.message || '付款失敗或已逾期');
+      } else {
+        // pending：繼續等
+        if (statusEl) {
+          statusEl.className = 'status loading';
+          statusEl.innerHTML = '<span class="spinner"></span>豐收款尚未確認入帳，繼續等候…';
+        }
+      }
+    } catch (err) {
+      console.warn('poll error:', err);
+      if (statusEl) {
+        statusEl.className = 'status loading';
+        statusEl.innerHTML = '網路異常，下一輪將自動重試';
+      }
+    }
+  }
+
+  // 付款成功 → 三層 fallback 自動關閉
+  function handlePaySuccess(data) {
+    setBrandHeader('員購付款', '付款成功');
+    const el = document.getElementById('redirect-status');
+    if (el) {
+      el.className = 'status';
+      el.style.display = 'block';
+      el.style.background = '#EAF7EE';
+      el.style.color = 'var(--success)';
+      el.style.border = '1px solid #BFE5C9';
+      el.innerHTML = '✅ 付款已完成，即將返回 LINE…';
+    }
+    // 三層 fallback：liff.closeWindow → line:// scheme → 顯示按鈕讓使用者手動
+    setTimeout(() => {
+      try {
+        if (typeof liff !== 'undefined' && liff.isInClient && liff.isInClient()) {
+          liff.closeWindow();
+          return;
+        }
+      } catch (e) { console.warn('liff.closeWindow failed:', e); }
+      try {
+        window.location.href = 'line://';
+        // 給 1.2 秒看是否成功跳走，否則進入第三層
+        setTimeout(() => {
+          if (el) {
+            el.innerHTML = '✅ 付款已完成。<br><a href="#" onclick="closeLiff();return false;" style="color:var(--gold-dark);font-weight:700;text-decoration:underline">點此手動關閉視窗</a>';
+          }
+        }, 1200);
+      } catch (e) {
+        if (el) {
+          el.innerHTML = '✅ 付款已完成。<br><a href="#" onclick="closeLiff();return false;" style="color:var(--gold-dark);font-weight:700;text-decoration:underline">點此手動關閉視窗</a>';
+        }
+      }
+    }, 800);
   }
 
   function showPayError(msg) {
